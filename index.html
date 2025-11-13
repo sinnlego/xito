@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>斩的游戏商城</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@latest"></script>
+  <style>
+    /* 基础样式 */
+    :root {
+      --primary: #ff2a6d;
+      --secondary: #05d9e8;
+      --dark: #0c0e27;
+      --darker: #05071a;
+      --light: #d1f7ff;
+      --card-bg: rgba(16, 18, 45, 0.7);
+      --card-border: rgba(5, 217, 232, 0.3);
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+      color: var(--light);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    /* 霓虹灯背景效果 */
+    .neon-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+    }
+    
+    .neon-circle {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.15;
+    }
+    
+    .circle-1 {
+      width: 300px;
+      height: 300px;
+      background: var(--primary);
+      top: -150px;
+      left: -150px;
+    }
+    
+    .circle-2 {
+      width: 400px;
+      height: 400px;
+      background: var(--secondary);
+      bottom: -200px;
+      right: -200px;
+    }
+    
+    /* 下雨效果 */
+    .rain {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    .drop {
+      position: absolute;
+      width: 2px;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 1px;
+      animation: fall 1.2s linear infinite;
+    }
+    
+    @keyframes fall {
+      0% { 
+        transform: translateY(-15px); 
+        opacity: 0; 
+      }
+      40% { opacity: 1; }
+      100% { 
+        transform: translateY(calc(100vh + 15px)); 
+        opacity: 0; 
+      }
+    }
+    
+    /* 头部样式 */
+    .header {
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+    
+    .logo {
+      font-size: 22px;
+      font-weight: bold;
+      background: linear-gradient(45deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 10px rgba(255, 42, 109, 0.3);
+    }
+    
+    .auth-btn {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--light);
+      border: 1px solid var(--card-border);
+      padding: 8px 15px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+      backdrop-filter: blur(5px);
+    }
+    
+    .auth-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 10px rgba(5, 217, 232, 0.5);
+    }
+    
+    /* 导航栏样式 */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      height: 70px;
+      background: rgba(12, 14, 39, 0.9);
+      display: flex;
+      border-top: 1px solid var(--card-border);
+      z-index: 5;
+      backdrop-filter: blur(10px);
+    }
+    
+    .nav-item {
+      flex: 1;
+      text-align: center;
+      padding: 12px 0;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    
+    .nav-item::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      width: 0;
+      height: 3px;
+      background: var(--secondary);
+      transition: width 0.3s;
+    }
+    
+    .nav-item.active::before {
+      width: 100%;
+    }
+    
+    .nav-item i {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    
+    .nav-item:active {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    /* 模块容器 */
+    .module {
+      display: none;
+      padding: 15px;
+      padding-bottom: 90px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.4s, transform 0.4s;
+    }
+    
+    .module.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .module-title {
+      font-size: 22px;
+      margin-top: 0;
+      margin-bottom: 20px;
+      position: relative;
+      padding-left: 15px;
+    }
+    
+    .module-title::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 4px;
+      background: var(--primary);
+      border-radius: 2px;
+    }
+    
+    /* 商品样式 */
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 15px;
+    }
+    
+    .product-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      transition: all 0.3s;
+      position: relative;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .product-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+      border-color: rgba(5, 217, 232, 0.6);
+    }
+    
+    .product-card.free::after {
+      content: '免费';
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--secondary);
+      color: var(--dark);
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+    
+    .product-image {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      background: linear-gradient(45deg, #111 25%, #222 25%, #222 50%, #111 50%, #111 75%, #222 75%, #222 100%);
+      background-size: 20px 20px;
+      animation: placeholder 1.5s infinite;
+    }
+    
+    @keyframes placeholder {
+      0% { background-position: 0 0; }
+      100% { background-position: 20px 20px; }
+    }
+    
+    .product-info {
+      padding: 12px;
+    }
+    
+    .product-name {
+      font-size: 14px;
+      margin: 0 0 8px 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .product-price {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--primary);
+      margin: 0 0 10px 0;
+    }
+    
+    .buy-btn {
+      background: linear-gradient(45deg, var(--primary), #ff5e9a);
+      color: white;
+      border: none;
+      padding: 8px 0;
+      width: 100%;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.3s;
+      box-shadow: 0 4px 10px rgba(255, 42, 109, 0.3);
+    }
+    
+    .buy-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 5px rgba(255, 42, 109, 0.3);
+    }
+    
+    .buy-btn.free {
+      background: linear-gradient(45deg, var(--secondary), #2de2eb);
+      box-shadow: 0 4px 10px rgba(5, 217, 232, 0.3);
+    }
+    
+    /* 弹窗样式 */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(5, 7, 26, 0.9);
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.3s;
+      backdrop-filter: blur(5px);
+    }
+    
+    .modal.active {
+      display: flex;
+      opacity: 1;
+    }
+    
+    .modal .content {
+      background: var(--card-bg);
+      padding: 25px;
+      border-radius: 15px;
+      border: 1px solid var(--card-border);
+      width: 85%;
+      max-width: 320px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      transform: scale(0.9);
+      animation: modalAppear 0.3s forwards;
+    }
+    
+    @keyframes modalAppear {
+      to { transform: scale(1); }
+    }
+    
+    .modal-title {
+      margin-top: 0;
+      text-align: center;
+      color: var(--secondary);
+    }
+    
+    input, select, textarea {
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--light);
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--secondary);
+      box-shadow: 0 0 0 2px rgba(5, 217, 232, 0.2);
+    }
+    
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    .modal-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+    
+    .modal-btn.primary {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .modal-btn.secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--light);
+    }
+    
+    .modal-btn:active {
+      transform: scale(0.95);
+    }
+    
+    /* 个人中心样式 */
+    .user-profile {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid var(--card-border);
+    }
+    
+    .user-welcome {
+      font-size: 18px;
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: var(--secondary);
+    }
+    
+    .user-actions {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .user-btn {
+      flex: 1;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--light);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .user-btn:active {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* 消息区域 */
+    .message-area {
+      margin-top: 20px;
+    }
+    
+    .message-title {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: var(--secondary);
+    }
+    
+    #message-history {
+      border: 1px solid var(--card-border);
+      padding: 15px;
+      height: 200px;
+      overflow-y: auto;
+      margin: 15px 0;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      scrollbar-width: thin;
+    }
+    
+    #message-history::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    #message-history::-webkit-scrollbar-thumb {
+      background: var(--secondary);
+      border-radius: 3px;
+    }
+    
+    .message-input-container {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .message-input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--light);
+    }
+    
+    .send-btn {
+      padding: 0 20px;
+      background: var(--secondary);
+      color: var(--dark);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+    
+    .send-btn:active {
+      transform: scale(0.95);
+    }
+    
+    /* 订单列表 */
+    .orders-list {
+      margin-top: 15px;
+    }
+    
+    .order-item {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-left: 3px solid var(--primary);
+    }
+    
+    /* 响应式调整 */
+    @media (min-width: 768px) {
+      .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+      }
+      
+      .product-image {
+        height: 150px;
+      }
+    }
+    
+    /* 加载动画 */
+    .loader {
+      display: none;
+      width: 40px;
+      height: 40px;
+      margin: 20px auto;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-left: 4px solid var(--secondary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- 霓虹灯背景 -->
+  <div class="neon-bg">
+    <div class="neon-circle circle-1"></div>
+    <div class="neon-circle circle-2"></div>
+  </div>
+  
+  <!-- 下雨效果 -->
+  <div class="rain" id="rain"></div>
+  
+  <!-- 头部 -->
+  <div class="header">
+    <div class="logo">游戏道具商城</div>
+    <div class="auth-btn" onclick="toggleAuth()">登录/注册</div>
+  </div>
+  
+  <!-- 登录/注册弹窗 -->
+  <div id="auth-modal" class="modal">
+    <div class="content">
+      <h2 class="modal-title">用户登录</h2>
+      <input type="email" id="email" placeholder="邮箱" required />
+      <input type="password" id="password" placeholder="密码（至少6位）" required />
+      <div class="modal-buttons">
+        <button class="modal-btn primary" onclick="signUp()">注册</button>
+        <button class="modal-btn secondary" onclick="signIn()">登录</button>
+        <button class="modal-btn secondary" onclick="toggleAuth()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部导航 -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="showModule('king')">
+      <i>👑</i>
+      <span>王者</span>
+    </div>
+    <div class="nav-item" onclick="showModule('peace')">
+      <i>🔫</i>
+      <span>和平</span>
+    </div>
+    <div class="nav-item" onclick="showModule('naruto')">
+      <i>🌀</i>
+      <span>火影</span>
+    </div>
+    <div class="nav-item" onclick="showModule('mine')">
+      <i>👤</i>
+      <span>我的</span>
+    </div>
+  </div>
+
+  <!-- 王者模块 -->
+  <div id="king" class="module active">
+    <h2 class="module-title">王者数据号</h2>
+    <div class="loader" id="king-loader"></div>
+    <div class="products-grid">
+      <div class="product-card">
+        <img src="" alt="王者商品图片" class="product-image" id="king-img" loading="lazy" />
+        <div class="product-info">
+          <h3 class="product-name">王者荣耀高级账号</h3>
+          <p class="product-price">¥<span id="king-price">0</span></p>
+          <button class="buy-btn" onclick="showPayCode('king')">立即购买</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 和平模块 -->
+  <div id="peace" class="module">
+    <h2 class="module-title">和平道具</h2>
+    <div class="loader" id="peace-loader"></div>
+    <div class="products-grid">
+      <div class="product-card">
+        <img src="" alt="和平付费商品图片" class="product-image" id="peace-paid-img" loading="lazy" />
+        <div class="product-info">
+          <h3 class="product-name">和平精英豪华礼包</h3>
+          <p class="product-price">¥<span id="peace-paid-price">0</span></p>
+          <button class="buy-btn" onclick="showPayCode('peace')">立即购买</button>
+        </div>
+      </div>
+      <div class="product-card free">
+        <img src="" alt="和平免费商品图片" class="product-image" id="peace-free-img" loading="lazy" />
+        <div class="product-info">
+          <h3 class="product-name">新手体验礼包</h3>
+          <p class="product-price">免费</p>
+          <button class="buy-btn free" onclick="freePurchase()">免费领取</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 火影模块 -->
+  <div id="naruto" class="module">
+    <h2 class="module-title">火影道具</h2>
+    <div class="loader" id="naruto-loader"></div>
+    <div class="products-grid">
+      <div class="product-card">
+        <img src="" alt="火影商品图片" class="product-image" id="naruto-img" loading="lazy" />
+        <div class="product-info">
+          <h3 class="product-name">火影忍者限定道具</h3>
+          <p class="product-price">¥<span id="naruto-price">0</span></p>
+          <button class="buy-btn" onclick="showPayCode('naruto')">立即购买</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 我的模块 -->
+  <div id="mine" class="module">
+    <h2 class="module-title">个人中心</h2>
+    
+    <div id="user-info" style="display: none;">
+      <div class="user-profile">
+        <h3 class="user-welcome">欢迎回来！<span id="username"></span></h3>
+        <div class="user-actions">
+          <button class="user-btn" onclick="showOrders()">我的订单</button>
+          <button class="user-btn" onclick="showAdminPanel()" id="admin-btn" style="display:none;">管理后台</button>
+          <button class="user-btn" onclick="signOut()">退出登录</button>
+        </div>
+      </div>
+      
+      <div id="orders-list" class="orders-list"></div>
+    </div>
+    
+    <div id="no-auth" style="display: block;">
+      <div class="user-profile">
+        <p>请先登录查看个人信息</p>
+      </div>
+    </div>
+
+    <!-- 消息区域 -->
+    <div class="message-area">
+      <h3 class="message-title">联系管理员</h3>
+      <div class="message-input-container">
+        <input type="text" id="message-input" placeholder="输入消息..." class="message-input" />
+        <button class="send-btn" onclick="sendMessage()">发送</button>
+      </div>
+      <div id="message-history"></div>
+    </div>
+  </div>
+
+  <!-- 收款码弹窗 -->
+  <div id="pay-modal" class="modal">
+    <div class="content">
+      <h2 class="modal-title">扫码支付</h2>
+      <img src="" alt="收款码" id="pay-code" style="width:100%;max-width:200px;margin:0 auto;display:block;border-radius:8px;" />
+      <p style="text-align: center; margin: 15px 0; color: var(--secondary);">支付后联系管理员确认</p>
+      <div class="modal-buttons">
+        <button class="modal-btn secondary" onclick="closeModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理后台弹窗 -->
+  <div id="admin-modal" class="modal">
+    <div class="content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
+      <h2 class="modal-title">管理后台</h2>
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="openAdminTab('products')">商品管理</button>
+        <button class="admin-tab" onclick="openAdminTab('orders')">订单管理</button>
+        <button class="admin-tab" onclick="openAdminTab('messages')">消息管理</button>
+        <button class="admin-tab" onclick="openAdminTab('stats')">数据统计</button>
+      </div>
+      
+      <div id="products-tab" class="admin-tab-content active">
+        <h3>商品列表</h3>
+        <div id="admin-products-list"></div>
+        <button class="modal-btn primary" style="margin-top: 15px;" onclick="showAddProductForm()">添加商品</button>
+      </div>
+      
+      <div id="orders-tab" class="admin-tab-content">
+        <h3>订单列表</h3>
+        <div id="admin-orders-list"></div>
+      </div>
+      
+      <div id="messages-tab" class="admin-tab-content">
+        <h3>用户消息</h3>
+        <div id="admin-messages-list"></div>
+      </div>
+      
+      <div id="stats-tab" class="admin-tab-content">
+        <h3>数据统计</h3>
+        <div id="admin-stats"></div>
+      </div>
+      
+      <div class="modal-buttons">
+        <button class="modal-btn secondary" onclick="closeAdminPanel()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 初始化 Supabase
+    const supabase = supabase.createClient(
+      'https://derdyfhnwuxuofqkumlf.supabase.co', 
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlcmR5Zmhud3V4dW9mcWt1bWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwMzIxMDUsImV4cCI6MjA3ODYwODEwMw0.k3o4OftswP3ov3K0tjYfEgJy8Rd3IHHKWS9W5Mbickk'
+    );
+
+    // 创建下雨效果
+    function createRain() {
+      const rain = document.getElementById('rain');
+      const dropCount = 80;
+      for (let i = 0; i < dropCount; i++) {
+        const drop = document.createElement('div');
+        drop.className = 'drop';
+        drop.style.left = `${Math.random() * 100}vw`;
+        drop.style.animationDelay = `${Math.random() * 3}s`;
+        drop.style.animationDuration = `${Math.random() * 1 + 1}s`;
+        rain.appendChild(drop);
+      }
+    }
+
+    // 模块切换+懒加载商品
+    let loadedModules = new Set(['king']);
+    function showModule(moduleId) {
+      // 更新导航状态
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      event.currentTarget.classList.add('active');
+      
+      // 隐藏所有模块
+      document.querySelectorAll('.module').forEach(module => {
+        module.classList.remove('active');
+      });
+      
+      // 显示目标模块
+      const targetModule = document.getElementById(moduleId);
+      targetModule.classList.add('active');
+      
+      // 懒加载商品数据
+      if (!loadedModules.has(moduleId)) {
+        if (moduleId === 'peace') getPeaceProducts();
+        if (moduleId === 'naruto') getNarutoProduct();
+        loadedModules.add(moduleId);
+      }
+      
+      // 我的模块检查登录
+      if (moduleId === 'mine') checkAuthStatus();
+    }
+
+    // 商品数据加载
+    async function getKingProduct() {
+      try {
+        document.getElementById('king-loader').style.display = 'block';
+        const { data } = await supabase.from('products').select('*').eq('game', '王者').single();
+        const img = document.getElementById('king-img');
+        img.src = data.image_url;
+        img.onload = () => {
+          img.style.animation = 'none';
+          document.getElementById('king-loader').style.display = 'none';
+        };
+        document.getElementById('king-price').innerText = data.price;
+      } catch (error) {
+        console.error('王者商品获取失败：', error);
+        document.getElementById('king-loader').style.display = 'none';
+      }
+    }
+
+    async function getPeaceProducts() {
+      try {
+        document.getElementById('peace-loader').style.display = 'block';
+        // 付费商品
+        const { data: paid } = await supabase.from('products').select('*').eq('game', '和平').eq('is_free', false).single();
+        const paidImg = document.getElementById('peace-paid-img');
+        paidImg.src = paid.image_url;
+        paidImg.onload = () => paidImg.style.animation = 'none';
+        document.getElementById('peace-paid-price').innerText = paid.price;
+        
+        // 免费商品
+        const { data: free } = await supabase.from('products').select('*').eq('game', '和平').eq('is_free', true).single();
+        const freeImg = document.getElementById('peace-free-img');
+        freeImg.src = free.image_url;
+        freeImg.onload = () => {
+          freeImg.style.animation = 'none';
+          document.getElementById('peace-loader').style.display = 'none';
+        };
+      } catch (error) {
+        console.error('和平商品获取失败：', error);
+        document.getElementById('peace-loader').style.display = 'none';
+      }
+    }
+
+    async function getNarutoProduct() {
+      try {
+        document.getElementById('naruto-loader').style.display = 'block';
+        const { data } = await supabase.from('products').select('*').eq('game', '火影').single();
+        const img = document.getElementById('naruto-img');
+        img.src = data.image_url;
+        img.onload = () => {
+          img.style.animation = 'none';
+          document.getElementById('naruto-loader').style.display = 'none';
+        };
+        document.getElementById('naruto-price').innerText = data.price;
+      } catch (error) {
+        console.error('火影商品获取失败：', error);
+        document.getElementById('naruto-loader').style.display = 'none';
+      }
+    }
+
+    // 支付弹窗
+    async function showPayCode(game) {
+      try {
+        const { data } = await supabase.from('products').select('pay_code_url').eq('game', game).single();
+        const payCodeImg = document.getElementById('pay-code');
+        payCodeImg.src = data.pay_code_url;
+        document.getElementById('pay-modal').classList.add('active');
+        
+        // 记录购买行为
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('purchase_logs').insert([{
+            user_id: user.id,
+            product_type: game,
+            action: 'view_pay_code'
+          }]);
+        }
+      } catch (error) {
+        alert('收款码加载失败，请稍后再试');
+      }
+    }
+    
+    function closeModal() {
+      document.querySelectorAll('.modal').forEach(modal => {
+        modal.classList.remove('active');
+      });
+    }
+    
+    function freePurchase() {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '领取成功！';
+      
+      // 记录免费领取
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          supabase.from('purchase_logs').insert([{
+            user_id: user.id,
+            product_type: '和平免费',
+            action: 'free_claim'
+          }]);
+        }
+      });
+      
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '免费领取';
+      }, 2000);
+    }
+
+    // 用户认证
+    function toggleAuth() {
+      const modal = document.getElementById('auth-modal');
+      modal.classList.toggle('active');
+    }
+    
+    async function signUp() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || password.length < 6) return alert('请输入有效邮箱和至少6位的密码');
+      
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) alert('注册失败：' + error.message);
+      else {
+        alert('注册成功，请登录');
+        document.getElementById('password').value = '';
+      }
+    }
+    
+    async function signIn() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) return alert('请输入邮箱和密码');
+      
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) alert('登录失败：' + error.message);
+      else {
+        toggleAuth();
+        checkAuthStatus();
+        document.getElementById('email').value = '';
+        document.getElementById('password').value = '';
+      }
+    }
+    
+    async function signOut() {
+      await supabase.auth.signOut();
+      checkAuthStatus();
+      alert('已退出登录');
+    }
+    
+    async function checkAuthStatus() {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userInfo = document.getElementById('user-info');
+      const noAuth = document.getElementById('no-auth');
+      
+      if (user) {
+        userInfo.style.display = 'block';
+        noAuth.style.display = 'none';
+        document.getElementById('username').textContent = user.email.split('@')[0];
+        loadMessageHistory();
+        
+        // 检查是否是管理员
+        const { data: admin } = await supabase.from('admins').select('*').eq('user_id', user.id).single();
+        if (admin) {
+          document.getElementById('admin-btn').style.display = 'block';
+        }
+      } else {
+        userInfo.style.display = 'none';
+        noAuth.style.display = 'block';
+      }
+    }
+
+    // 消息功能
+    async function sendMessage() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return alert('请先登录');
+      
+      const content = document.getElementById('message-input').value.trim();
+      if (!content) return;
+      
+      try {
+        await supabase.from('messages').insert([{
+          user_id: user.id,
+          content,
+          is_read: false
+        }]);
+        document.getElementById('message-input').value = '';
+        loadMessageHistory();
+      } catch (error) {
+        alert('消息发送失败，请稍后再试');
+      }
+    }
+    
+    async function loadMessageHistory() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      try {
+        const { data } = await supabase.from('messages')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('create_time', { ascending: true });
+        
+        const history = document.getElementById('message-history');
+        history.innerHTML = data.length ? data.map(msg => `
+          <div style="margin: 10px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+            <div style="font-size: 14px;">${msg.content}</div>
+            <div style="font-size: 12px; color: ${msg.is_read ? '#666' : '#ff2a6d'}; margin-top: 5px;">
+              ${msg.is_read ? '[已读]' : '[未读]'} • ${new Date(msg.create_time).toLocaleString()}
+            </div>
+          </div>
+        `).join('') : '<p style="text-align: center; color: #666; font-size: 14px;">暂无消息</p>';
+        
+        history.scrollTop = history.scrollHeight;
+      } catch (error) {
+        console.error('消息加载失败：', error);
+      }
+    }
+
+    // 查看订单
+    async function showOrders() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      try {
+        const { data } = await supabase.from('orders').select('*').eq('user_id', user.id);
+        const list = document.getElementById('orders-list');
+        list.innerHTML = data.length ? data.map(order => `
+          <div class="order-item">
+            <div style="font-weight: bold;">${order.product}</div>
+            <div style="font-size: 14px; margin-top: 5px; color: ${order.status === '已完成' ? '#05d9e8' : '#ff2a6d'}">状态：${order.status}</div>
+            <div style="font-size: 12px; margin-top: 5px; color: #888;">${new Date(order.create_time).toLocaleString()}</div>
+          </div>
+        `).join('') : '<div class="order-item">暂无订单</div>';
+      } catch (error) {
+        alert('订单加载失败，请稍后再试');
+      }
+    }
+
+    // 管理后台功能
+    function showAdminPanel() {
+      document.getElementById('admin-modal').classList.add('active');
+      loadAdminProducts();
+    }
+    
+    function closeAdminPanel() {
+      document.getElementById('admin-modal').classList.remove('active');
+    }
+    
+    function openAdminTab(tabName) {
+      // 隐藏所有标签内容
+      document.querySelectorAll('.admin-tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      // 取消所有标签的激活状态
+      document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      
+      // 激活当前标签
+      document.getElementById(`${tabName}-tab`).classList.add('active');
+      event.currentTarget.classList.add('active');
+      
+      // 加载对应标签的数据
+      if (tabName === 'products') loadAdminProducts();
+      if (tabName === 'orders') loadAdminOrders();
+      if (tabName === 'messages') loadAdminMessages();
+      if (tabName === 'stats') loadAdminStats();
+    }
+    
+    async function loadAdminProducts() {
+      try {
+        const { data } = await supabase.from('products').select('*');
+        const list = document.getElementById('admin-products-list');
+        list.innerHTML = data.length ? data.map(product => `
+          <div style="padding: 10px; margin: 10px 0; background: rgba(255,255,255,0.05); border-radius: 8px;">
+            <div><strong>${product.game}</strong> - ${product.is_free ? '免费' : '¥' + product.price}</div>
+            <div style="font-size: 14px; color: #888;">ID: ${product.id}</div>
+            <button class="user-btn" style="margin-top: 5px;" onclick="editProduct('${product.id}')">编辑</button>
+            <button class="user-btn" style="margin-top: 5px; background: rgba(255,0,0,0.2);" onclick="deleteProduct('${product.id}')">删除</button>
+          </div>
+        `).join('') : '<p>暂无商品</p>';
+      } catch (error) {
+        console.error('商品加载失败：', error);
+      }
+    }
+    
+    async function loadAdminOrders() {
+      try {
+        const { data } = await supabase.from('orders').select('*');
+        const list = document.getElementById('admin-orders-list');
+        list.innerHTML = data.length ? data.map(order => `
+          <div style="padding: 10px; margin: 10px 0; background: rgba(255,255,255,0.05); border-radius: 8px;">
+            <div><strong>${order.product}</strong> - 用户ID: ${order.user_id}</div>
+            <div style="font-size: 14px; color: ${order.status === '已完成' ? '#05d9e8' : '#ff2a6d'}">状态：${order.status}</div>
+            <div style="font-size: 12px; color: #888;">${new Date(order.create_time).toLocaleString()}</div>
+            <button class="user-btn" style="margin-top: 5px;" onclick="updateOrderStatus('${order.id}', 'completed')">标记完成</button>
+          </div>
+        `).join('') : '<p>暂无订单</p>';
+      } catch (error) {
+        console.error('订单加载失败：', error);
+      }
+    }
+    
+    async function loadAdminMessages() {
+      try {
+        const { data } = await supabase.from('messages').select('*, users(email)');
+        const list = document.getElementById('admin-messages-list');
+        list.innerHTML = data.length ? data.map(msg => `
+          <div style="padding: 10px; margin: 10px 0; background: rgba(255,255,255,0.05); border-radius: 8px;">
+            <div><strong>${msg.users.email}</strong>: ${msg.content}</div>
+            <div style="font-size: 14px; color: ${msg.is_read ? '#666' : '#ff2a6d'}">${msg.is_read ? '[已读]' : '[未读]'}</div>
+            <div style="font-size: 12px; color: #888;">${new Date(msg.create_time).toLocaleString()}</div>
+            <button class="user-btn" style="margin-top: 5px;" onclick="markMessageRead('${msg.id}')">标记已读</button>
+          </div>
+        `).join('') : '<p>暂无消息</p>';
+      } catch (error) {
+        console.error('消息加载失败：', error);
+      }
+    }
+    
+    async function loadAdminStats() {
+      try {
+        // 获取统计数据
+        const { data: visits } = await supabase.from('visits').select('*');
+        const { data: messages } = await supabase.from('messages').select('*');
+        const { data: orders } = await supabase.from('orders').select('*');
+        const { data: purchaseLogs } = await supabase.from('purchase_logs').select('*');
+        
+        const stats = document.getElementById('admin-stats');
+        stats.innerHTML = `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${visits.length}</div>
+              <div>总访问量</div>
+            </div>
+            <div style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${messages.length}</div>
+              <div>总消息数</div>
+            </div>
+            <div style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${orders.length}</div>
+              <div>总订单数</div>
+            </div>
+            <div style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: var(--secondary);">${purchaseLogs.length}</div>
+              <div>购买行为</div>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('统计数据加载失败：', error);
+      }
+    }
+    
+    // 页面初始化
+    window.onload = () => {
+      createRain();
+      getKingProduct();
+      checkAuthStatus();
+      
+      // 记录访问量
+      setTimeout(() => {
+        supabase.from('visits').insert([{ timestamp: new Date() }]);
+      }, 1000);
+    };
+  </script>
+</body>
+    </html>
